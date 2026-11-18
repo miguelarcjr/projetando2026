@@ -1,0 +1,5 @@
+.code-review-graph/
+.gemini/
+.vscode/
+.idea/
+*.log
