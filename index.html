@@ -227,7 +227,7 @@ button.small{padding:6px 10px;font-size:13px}
 </div>
 
 <div class="pane" id="tab-rel" hidden>
-<div class="card" id="relCard"><h2>Relatório mensal</h2><div class="noprint"><label for="rMes">Mês</label><input type="month" id="rMes" placeholder="AAAA-MM" style="max-width:220px"><label for="rCli" style="margin-top:10px">Cliente</label><select id="rCli"><option value="">Todos os clientes</option></select><div class="row"><button id="rPdf">Baixar nota em PDF</button><button class="ghost" id="rCopy">Copiar relatório</button></div></div><div id="rep"></div></div>
+<div class="card" id="relCard"><h2>Relatório mensal</h2><div class="noprint"><label for="rMes">Mês</label><input type="month" id="rMes" placeholder="AAAA-MM" style="max-width:220px"><label for="rCli" style="margin-top:10px">Cliente</label><select id="rCli"><option value="">Todos os clientes</option></select><div class="row"><button id="rPdf">Baixar nota em PDF</button><button class="ghost" id="rPrint">Imprimir</button><button class="ghost" id="rCopy">Copiar relatório</button></div></div><div id="rep"></div></div>
 </div>
 <p class="note" id="msg" role="status">☁️ Conectado ao Supabase: registros salvos em nuvem e sincronizados.</p>
 </main>
@@ -644,15 +644,28 @@ function repText(){var N=repNotes(),ym=$("rMes").value,o="PROJETANDO - Relatóri
  N.forEach(function(n){o+="\nCLIENTE: "+n.cliente+(n.tel?" | TELEFONE: "+n.tel:"")+(n.end?" | ENDEREÇO: "+n.end:"")+"\n";n.rows.forEach(function(r){o+="- "+r[0]+" | qtd "+r[1]+" | unit. "+r[2]+" | total "+r[3]+"\n"});o+="VALOR TOTAL: "+n.totalTxt+"\n"});return o}
 function copyTxt(t,ok){try{navigator.clipboard.writeText(t).then(function(){$("msg").textContent=ok},function(){$("msg").textContent="Não foi possível copiar neste ambiente."})}catch(e){$("msg").textContent="Não foi possível copiar neste ambiente."}}
 $("rMes").oninput=repRender;$("rMes").onchange=repRender;$("rCli").onchange=repRender;
-$("rPdf").onclick=async function(){
+function downloadBlob(data,filename,type){
+ var blob=new Blob([data],{type:type||"application/octet-stream"});
+ var url=URL.createObjectURL(blob);
+ var a=document.createElement("a");
+ a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+ setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url)},1000);
+}
+$("rPdf").onclick=function(){
  var N=repNotes(),ym=$("rMes").value,msg=$("msg");
  if(!N.length){msg.textContent="Não há serviços neste mês para gerar a nota.";return}
- var d=null;try{d=window.claude?await window.claude.use("downloads"):null}catch(e){d=null}
- if(!d){msg.textContent="O download não está disponível aqui. Use \"Copiar relatório\".";return}
  var sel=$("rCli").value,nm=sel?sel.replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""):"todos";
- try{await d.save({filename:"nota-"+(nm||"cliente")+"-"+ym+".pdf",data:mkNota(N,periodTxt(ym))});msg.textContent="PDF salvo. Abra o arquivo para imprimir."}
- catch(e){msg.textContent=(e&&e.code==="declined")?"Download cancelado.":"Não foi possível salvar o PDF aqui. Use \"Copiar relatório\"."}
+ var filename="nota-"+(nm||"cliente")+"-"+ym+".pdf";
+ try{
+  var pdfBytes=mkNota(N,periodTxt(ym));
+  downloadBlob(pdfBytes,filename,"application/pdf");
+  msg.textContent="PDF baixado com sucesso ("+filename+"). Abra o arquivo para visualizar ou imprimir.";
+ }catch(e){
+  console.error("Erro ao gerar PDF:",e);
+  msg.textContent="Não foi possível gerar o PDF. Use \"Imprimir\" ou \"Copiar relatório\".";
+ }
 };
+$("rPrint").onclick=function(){window.print()};
 $("rCopy").onclick=function(){copyTxt(repText(),"Relatório copiado.")};
 $("bCopy").onclick=function(){copyTxt(monthList().map(function(x){return x.date+" | "+x.client+" | "+x.type+" | qtd "+(x.qty||1)+" | unit. "+brl.format(unit(x))+" | total "+brl.format(tot(x))}).join("\n"),"Lista copiada.")};
 function showTab(n){["novo","lista","agenda","fin","saldo","rel"].forEach(function(k){$("tab-"+k).hidden=k!==n;$("t-"+k).setAttribute("aria-selected",k===n?"true":"false")})}
